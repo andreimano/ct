@@ -92,7 +92,7 @@ cluster a target. `ct` shows only the files that end with `.sbatch`.
 in your sbatch files are correct on every cluster. Put the settings that change from cluster
 to cluster in the directory of that cluster, for example the partition and the account.
 
-## Each day
+## Send jobs
 
 ```bash
 git push
