@@ -117,7 +117,9 @@ again with the label `changed`. If you select a subset, `ct` marks the other fil
 | `ct run hpc1` | Select the files on one cluster |
 | `ct new` | Show the new files. Start nothing |
 | `ct st` | Show your jobs on all clusters |
+| `ct st hpc1 gpu1` | Show your jobs on some of the clusters |
 | `ct st all` | Show the jobs of all users |
+| `ct st all hpc1` | Show the jobs of all users on one cluster |
 | `ct st -w` | Show your jobs. Refresh every 5 seconds |
 | `ct st -a` | Also show your jobs that stopped |
 | `ct free` | Show the partitions, the nodes and the GPUs |
@@ -132,6 +134,8 @@ again with the label `changed`. If you select a subset, `ct` marks the other fil
 | `ct seen` | Show the record of the sbatch files |
 
 The `-y` option answers the questions. `-y` never pushes your work.
+
+Run `ct --help` for these forms, or `ct <command> --help` for one command.
 
 ## Job names
 

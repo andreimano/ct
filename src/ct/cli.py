@@ -23,6 +23,21 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help="Dispatch and watch SLURM jobs on several clusters.",
+    # The forms below hinge on positional values ('all', a job reference), so they cannot
+    # show up in the command list. Spell them out here instead.
+    epilog=(
+        "Forms that are easy to miss:\n\n"
+        "ct run all              submit every sbatch file that is new or changed\n"
+        "ct run hpc1 a.sbatch    submit named files to one cluster\n"
+        "ct st all               every user's jobs, not only yours\n"
+        "ct st all hpc1          every user's jobs on one cluster\n"
+        "ct st hpc1 gpu1         your jobs on some of the clusters\n"
+        "ct log hpc1:4821 -f     follow a log; 'ct log 4821' works if unambiguous\n"
+        "ct kill hpc1 4821       cluster and id as two words, for any job\n"
+        "ct sh hpc1 -- nvidia-smi   run one command on a host\n"
+        "ct sync all             pull on every cluster, submit nothing\n\n"
+        "Add -n to see what a command would do. Add -y to skip its questions."
+    ),
 )
 
 PROJECT = typer.Option(None, "-p", "--project", help="Project name.")
@@ -42,12 +57,16 @@ def _project_or_none(name=None):
         return None
 
 
-def _clusters(g, target):
-    if not target:
+def _clusters(g, names):
+    """Validate cluster names, keeping config order. No names means every cluster."""
+    if not names:
         return g.clusters
-    if target not in g.clusters:
-        raise CtError(f"unknown cluster {target!r} — known: {', '.join(g.clusters)}")
-    return [target]
+    unknown = [n for n in names if n not in g.clusters]
+    if unknown:
+        raise CtError(
+            f"unknown cluster: {', '.join(unknown)} — known: {', '.join(g.clusters)}"
+        )
+    return [c for c in g.clusters if c in names]
 
 
 def _branch(p, override):
@@ -294,7 +313,13 @@ def run(
     ),
     project_name: Optional[str] = PROJECT,
 ):
-    """Submit sbatch files to a cluster, or `ct run all` for everything new."""
+    """Submit sbatch files to a cluster, or `ct run all` for everything new.
+
+    ct run all               every sbatch file that is new or changed, on every cluster
+    ct run all -t hpc1       the same, restricted to some clusters
+    ct run hpc1              pick from one cluster interactively
+    ct run hpc1 a.sbatch     submit named files
+    """
     p = find_project(project_name)
     if target == "all":
         if files:
@@ -337,6 +362,8 @@ def _run_one(p, target, names, branch_opt, dry, yes):
         }
         if missing:
             raise CtError(f"not on {ref} under slurm/{target}/: {', '.join(sorted(missing))}")
+    elif dry:
+        chosen = candidates  # -n means "show me": listing beats prompting for a choice
     else:
         picked = set(ui.pick(f"sbatch files for {target}", [path for _, path in candidates]))
         chosen = [(b, path) for b, path in candidates if path in picked]
@@ -525,8 +552,10 @@ def _add_finished(t, project, live):
 
 @app.command()
 def st(
-    target: Optional[str] = typer.Argument(
-        None, help="One cluster, or 'all' for every user's jobs."
+    targets: Optional[List[str]] = typer.Argument(
+        None,
+        metavar="[all] [CLUSTER...]",
+        help="Say 'all' for every user's jobs. Name clusters to limit the view.",
     ),
     show_all: bool = typer.Option(
         False, "-a", "--all", help="Also show finished jobs from this project."
@@ -534,12 +563,19 @@ def st(
     watch: bool = typer.Option(False, "-w", "--watch", help="Refresh every 5s."),
     project_name: Optional[str] = PROJECT,
 ):
-    """Show your SLURM queue across all clusters, or everyone's with `ct st all`."""
+    """Show the SLURM queue. `ct st all` shows every user's jobs, not only yours.
+
+    ct st                 your jobs, every cluster
+    ct st hpc1 gpu1       your jobs, those clusters
+    ct st all             every user's jobs, every cluster
+    ct st all hpc1        every user's jobs, one cluster
+    """
     g = require_clusters()
-    everyone = target == "all"
+    args = list(targets or [])
+    everyone = "all" in args
     if everyone and show_all:
         raise CtError("-a lists your own finished jobs; it does not combine with `st all`")
-    clusters = g.clusters if everyone else _clusters(g, target)
+    clusters = _clusters(g, [a for a in args if a != "all"])
     project = find_project(project_name) if show_all else None
 
     def render():
@@ -557,9 +593,13 @@ def st(
 
 
 @app.command()
-def free(target: Optional[str] = typer.Argument(None, help="Limit to one cluster.")):
+def free(
+    targets: Optional[List[str]] = typer.Argument(
+        None, metavar="[CLUSTER...]", help="Limit to these clusters."
+    )
+):
     """Show partitions, nodes and GPUs across all clusters."""
-    clusters = _clusters(require_clusters(), target)
+    clusters = _clusters(require_clusters(), list(targets or []))
     results = remote.fanout(clusters, lambda a: slurm.SINFO)
     for c in clusters:
         r = results[c]

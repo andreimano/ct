@@ -265,10 +265,16 @@ gpu2    —         (no jobs)
 - Fan out `squeue -u $(whoami) --noheader -o '%i|%j|%T|%M|%R'`. One table, grouped by
   cluster. **Not `--me`** — that flag needs SLURM 20.02+, and a 19.05 controller rejects it
   with a usage error; `-u $(whoami)` works on every version.
-- `TARGET` = `all` shows **every user's** jobs on every cluster, for judging contention
-  before submitting. Adds a `USER` column (`%u`) and a per-cluster count caption, since on
-  a busy cluster the counts are the useful part. Refuses to combine with `-a`, which lists
-  only your own finished jobs.
+- The positional is a **list**, so `all` composes with cluster names rather than occupying
+  the slot: `ct st`, `ct st hpc1 gpu1`, `ct st all`, `ct st all hpc1`. Parsing is one line
+  (`everyone = "all" in args`), and multi-cluster views fall out for free — `ct free` takes
+  the same list.
+- `all` shows **every user's** jobs, for judging contention before submitting. Adds a `USER`
+  column (`%u`) and a per-cluster count caption, since on a busy cluster the counts are the
+  useful part. Refuses to combine with `-a`, which lists only your own finished jobs.
+- Forms that hinge on a positional value (`all`, a job reference) cannot appear in the
+  command list, so the top-level `--help` carries an epilog spelling them out, and each
+  command's docstring lists its own forms.
 - `-a`: the one project-scoped flag — for jobs in the project's `jobs.jsonl` absent from
   the live queue of a *reachable* cluster, batch-query per cluster
   `sacct -j id1,id2 -n -P -X --format=JobID,State,ExitCode,Elapsed` and append the rows
