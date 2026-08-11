@@ -1,12 +1,39 @@
 # Cluster Tool (ct)
 
 Cluster Tool sends SLURM jobs to more than one cluster. You run it on one computer, for
-example a laptop.
+example a laptop. `ct` gets the names of your clusters from `~/.ssh/config`. It keeps no
+list of hosts of its own.
 
 ## Warning
 
 An AI model (Claude) wrote all of this code. There are no tests. Test each command before
 you use it for important work. The `-n` option shows the actions but does not do them.
+
+## Your hosts
+
+`ct` reads `~/.ssh/config` and uses the `Host` names that it finds there. For example:
+
+```ssh-config
+Host hpc1
+  HostName login.example.org
+  User myaccount
+  ForwardAgent yes
+
+Host gpu1
+  HostName gpu.example.org
+  User myaccount
+  ForwardAgent yes
+
+Host ws
+  HostName workstation.example.org
+```
+
+With this file you write `hpc1`, `gpu1` and `ws` in every `ct` command. `ct` ignores a
+pattern such as `Host *`, and it also ignores an `Include` line.
+
+`ct` starts the `ssh` program for each connection. Therefore `ssh` reads your keys and your
+certificates, and `ct` never reads them. Keep `ForwardAgent yes` for each cluster: this
+setting lets the cluster read your git remote.
 
 ## How it works
 
@@ -34,8 +61,9 @@ Run this command one time:
 ct init
 ```
 
-Select your SLURM clusters and your workstations from `~/.ssh/config`. `ct` writes them to
-`~/.config/ct/config.toml`. Run the command again to change the selection.
+`ct` shows the `Host` names from `~/.ssh/config`. Select the SLURM clusters, then select the
+workstations. `ct` writes your selection to `~/.config/ct/config.toml`. Run the command
+again to change it.
 
 Then run this command in a git repository:
 
@@ -113,8 +141,6 @@ the number, but `ct` shows an error if two clusters use that number.
 
 ## Notes
 
-- `ct` uses the `ssh` program, so your keys, certificates and `ForwardAgent` settings
-  continue to work. `ForwardAgent` lets a cluster read your git remote.
 - On a cluster, `ct` uses `git merge --ff-only`. `ct` does not start a job if the cluster is
   not at the same commit as the git remote.
 - `ct` uses `squeue -u $(whoami)`, which also works with SLURM 19.05.
