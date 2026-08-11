@@ -19,24 +19,31 @@ from .config import (CONFIG_PATH, CtError, Global, Project, find_project,
                      load_global, require_clusters, save_global, write_project)
 from .ui import console
 
+def _forms(*rows):
+    """Lay out example commands for --help.
+
+    Separated by blank lines, not newlines: typer before 0.20 reflows help text into a
+    paragraph, and a blank line is the only break that every version keeps. Markdown
+    fences and click's \\b marker are both swallowed.
+    """
+    return "\n\n".join(f"{cmd:<24}{what}" for cmd, what in rows)
+
+
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     help="Dispatch and watch SLURM jobs on several clusters.",
-    # The forms below hinge on positional values ('all', a job reference), so they cannot
-    # show up in the command list. Spell them out here instead.
+    # These forms hinge on a positional value ('all', a job reference), so they cannot
+    # appear in the command list above. Spell them out here instead.
     epilog=(
-        "Forms that are easy to miss:\n\n"
-        "ct run all              submit every sbatch file that is new or changed\n"
-        "ct run hpc1 a.sbatch    submit named files to one cluster\n"
-        "ct st all               every user's jobs, not only yours\n"
-        "ct st all hpc1          every user's jobs on one cluster\n"
-        "ct st hpc1 gpu1         your jobs on some of the clusters\n"
-        "ct log hpc1:4821 -f     follow a log; 'ct log 4821' works if unambiguous\n"
-        "ct kill hpc1 4821       cluster and id as two words, for any job\n"
-        "ct sh hpc1 -- nvidia-smi   run one command on a host\n"
-        "ct sync all             pull on every cluster, submit nothing\n\n"
-        "Add -n to see what a command would do. Add -y to skip its questions."
+        "Forms that use a positional value, so they are not listed above:\n\n"
+        + _forms(
+            ("ct run all", "submit every sbatch file that is new or changed"),
+            ("ct st all [CLUSTER]", "every user's jobs, not only yours"),
+            ("ct log hpc1:4821 -f", "follow a job's output"),
+            ("ct kill hpc1 4821", "cluster and id as two words, for any job"),
+        )
+        + "\n\nAdd -n to preview a command. Add -y to skip its questions."
     ),
 )
 
@@ -313,12 +320,15 @@ def run(
     ),
     project_name: Optional[str] = PROJECT,
 ):
-    """Submit sbatch files to a cluster, or `ct run all` for everything new.
+    """Submit sbatch files to a cluster.
 
-    ct run all               every sbatch file that is new or changed, on every cluster
-    ct run all -t hpc1       the same, restricted to some clusters
-    ct run hpc1              pick from one cluster interactively
-    ct run hpc1 a.sbatch     submit named files
+    ct run all              every file that is new or changed, on every cluster
+
+    ct run all -t hpc1      the same, restricted to some clusters
+
+    ct run hpc1             pick from one cluster interactively
+
+    ct run hpc1 a.sbatch    submit named files
     """
     p = find_project(project_name)
     if target == "all":
@@ -563,12 +573,13 @@ def st(
     watch: bool = typer.Option(False, "-w", "--watch", help="Refresh every 5s."),
     project_name: Optional[str] = PROJECT,
 ):
-    """Show the SLURM queue. `ct st all` shows every user's jobs, not only yours.
+    """Show the SLURM queue. By default, your own jobs on every cluster.
 
-    ct st                 your jobs, every cluster
-    ct st hpc1 gpu1       your jobs, those clusters
-    ct st all             every user's jobs, every cluster
-    ct st all hpc1        every user's jobs, one cluster
+    ct st all               every user's jobs, not only yours
+
+    ct st all hpc1          the same, for one cluster
+
+    ct st hpc1 gpu1         your jobs on some of the clusters
     """
     g = require_clusters()
     args = list(targets or [])

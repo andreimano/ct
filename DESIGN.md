@@ -274,7 +274,11 @@ gpu2    —         (no jobs)
   useful part. Refuses to combine with `-a`, which lists only your own finished jobs.
 - Forms that hinge on a positional value (`all`, a job reference) cannot appear in the
   command list, so the top-level `--help` carries an epilog spelling them out, and each
-  command's docstring lists its own forms.
+  command's docstring lists its own forms. **Separate those lines with blank lines**
+  (`_forms()` in `cli.py`): typer before 0.20 reflows help text into a paragraph, and a
+  blank line is the only break every version keeps — markdown fences and click's `\b`
+  marker are both swallowed. Verified on typer 0.19 and 0.27; check both when editing help
+  text, since the newer one hides the bug.
 - `-a`: the one project-scoped flag — for jobs in the project's `jobs.jsonl` absent from
   the live queue of a *reachable* cluster, batch-query per cluster
   `sacct -j id1,id2 -n -P -X --format=JobID,State,ExitCode,Elapsed` and append the rows
